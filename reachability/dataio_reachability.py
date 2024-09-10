@@ -8,17 +8,23 @@ class Reachability8D(Dataset):
         super().__init__()
         torch.manual_seed(0)
 
+
         self.pretrain = pretrain
         self.numpoints = numpoints
 
+
         self.collisionR = collisionR
 
+
         self.num_states = 8
+
 
         self.tMax = tMax
         self.tMin = tMin
 
+
         self.N_src_samples = num_src_samples
+
 
         self.pretrain_counter = 0
         self.counter = counter_start
@@ -31,11 +37,14 @@ class Reachability8D(Dataset):
         self.num_end = 2000
         self.counter_next = 0
 
+
         # Set the seed
         torch.manual_seed(seed)
 
+
     def __len__(self):
         return 1
+
 
     # def __getitem__(self, idx):
     #     start_time = 0.  # time to apply  initial conditions
@@ -123,42 +132,62 @@ class Reachability8D(Dataset):
     #
     #     return {'coords': coords}, {'source_boundary_values': boundary_values, 'dirichlet_mask': dirichlet_mask}
 
+
     def __getitem__(self, idx):
         start_time = 0.  # time to apply  initial conditions
 
-        # uniformly sample domain and include coordinates where source is non-zero
-        coords_1 = torch.zeros(self.numpoints, self.num_states).uniform_(-0.01, 0.01)
-        coords_2 = torch.zeros(2 * self.numpoints, self.num_states).uniform_(-0.1, 0.1)
-        coords_3 = torch.zeros(2 * self.numpoints, self.num_states).uniform_(-0.2, 0.2)
-        coords_4 = torch.zeros(2 * self.numpoints, self.num_states).uniform_(-0.5, 0.5)
-        coords_5 = torch.zeros(2 * self.numpoints, self.num_states).uniform_(-0.8, 0.8)
-        coords_6 = torch.zeros(3 * self.numpoints, self.num_states).uniform_(-1, 1)
 
-        coords = torch.cat((coords_1, coords_2, coords_3, coords_4, coords_5, coords_6), dim=0)
-        # coords[:10000, 4:5] = coords[:10000, 0:1] + torch.zeros(10000, 1).uniform_(0, 0.035)
-        # coords[:10000, 5:6] = coords[:10000, 1:2] + torch.zeros(10000, 1).uniform_(0, 0.035)
-        # coords[-10000:, 4:5] = coords[-10000:, 0:1] + torch.zeros(10000, 1).uniform_(0, 0.035)
-        # coords[-10000:, 5:6] = coords[-10000:, 1:2] + torch.zeros(10000, 1).uniform_(0, 0.035)
+        # uniformly sample domain and include coordinates where source is non-zero
+        coords = torch.zeros(self.numpoints, self.num_states).uniform_(-1, 1)
+        coords[:10000, 4:5] = coords[:10000, 0:1] + torch.zeros(10000, 1).uniform_(0, 0.035)  # cr=0.05
+        coords[:10000, 5:6] = coords[:10000, 1:2] + torch.zeros(10000, 1).uniform_(0, 0.035)
+        coords[-1000:, 4:5] = coords[-1000:, 0:1] + torch.zeros(1000, 1).uniform_(0, 0.035)
+        coords[-1000:, 5:6] = coords[-1000:, 1:2] + torch.zeros(1000, 1).uniform_(0, 0.035)
+
+
+        # old RA/RD setting
+        # coords[:8000, 4:5] = coords[:8000, 0:1] + torch.zeros(8000, 1).uniform_(0, 0.035)  # cr=0.05
+        # coords[:8000, 5:6] = coords[:8000, 1:2] + torch.zeros(8000, 1).uniform_(0, 0.035)
+        # coords[-1000:, 4:5] = coords[-1000:, 0:1] + torch.zeros(1000, 1).uniform_(0, 0.035)
+        # coords[-1000:, 5:6] = coords[-1000:, 1:2] + torch.zeros(1000, 1).uniform_(0, 0.035)
+
+
+        # coords[:6000, 4:5] = coords[:6000, 0:1] + torch.zeros(6000, 1).uniform_(0, 0.1)  # cr=0.15
+        # coords[:6000, 5:6] = coords[:6000, 1:2] + torch.zeros(6000, 1).uniform_(0, 0.1)
+        # coords[-1000:, 4:5] = coords[-1000:, 0:1] + torch.zeros(1000, 1).uniform_(0, 0.1)
+        # coords[-1000:, 5:6] = coords[-1000:, 1:2] + torch.zeros(1000, 1).uniform_(0, 0.1)
+
+
+        # coords[:6000, 4:5] = coords[:6000, 0:1] + torch.zeros(6000, 1).uniform_(0, 0.17)  # cr=0.25
+        # coords[:6000, 5:6] = coords[:6000, 1:2] + torch.zeros(6000, 1).uniform_(0, 0.17)
+        # coords[-1000:, 4:5] = coords[-1000:, 0:1] + torch.zeros(1000, 1).uniform_(0, 0.17)
+        # coords[-1000:, 5:6] = coords[-1000:, 1:2] + torch.zeros(1000, 1).uniform_(0, 0.17)
+
 
         if self.pretrain:
             # only sample in time around the initial condition
-            time = torch.ones(coords.shape[0], 1) * start_time
+            time = torch.ones(self.numpoints, 1) * start_time
             coords = torch.cat((time, coords), dim=1)
+
 
         else:
             # slowly grow time values from start time
             # this currently assumes start_time = 0 and max time value is tMax
-            time = self.tMin + torch.zeros(coords.shape[0], 1).uniform_(0, (self.tMax - self.tMin) * (
+            time = self.tMin + torch.zeros(self.numpoints, 1).uniform_(0, (self.tMax - self.tMin) * (
                     self.counter / self.full_count))
 
+
             coords = torch.cat((time, coords), dim=1)
+
 
             # make sure we always have training samples at the initial time
             coords[-self.N_src_samples:, 0] = start_time
 
+
         # set up the initial value function
         # boundary_values = self.collisionR - torch.sqrt((coords[:, 1:2]-coords[:, 5:6])**2+(coords[:, 2:3]-coords[:, 6:7])**2)
         boundary_values = torch.sqrt((coords[:, 1:2] - coords[:, 5:6])**2 + (coords[:, 2:3] - coords[:, 6:7])**2) - self.collisionR
+
 
         if self.pretrain:
             dirichlet_mask = torch.ones(coords.shape[0], 1) > 0
@@ -166,12 +195,15 @@ class Reachability8D(Dataset):
             # only enforce initial conditions around start_time
             dirichlet_mask = (coords[:, 0, None] == start_time)
 
+
         if self.pretrain:
             self.pretrain_counter += 1
         elif self.counter < self.full_count:
             self.counter += 1
 
+
         if self.pretrain and self.pretrain_counter == self.pretrain_iters:
             self.pretrain = False
+
 
         return {'coords': coords}, {'source_boundary_values': boundary_values, 'dirichlet_mask': dirichlet_mask}
